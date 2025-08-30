@@ -1,0 +1,19 @@
+{
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "frontend/**"
+      }
+    },
+    {
+      "src": "api.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api.py" },
+    { "source": "/(.*)", "destination": "/build/index.html" }
+  ]
+}

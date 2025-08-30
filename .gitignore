@@ -1,0 +1,17 @@
+# Virtual environment
+venv/
+
+# Python cache files
+__pycache__/
+
+# macOS files
+.DS_Store
+
+# Local environment variables
+.env
+
+# Ignore the raw audio files
+audio/
+
+# Ignore the large joblib files
+*.joblib
