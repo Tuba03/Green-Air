@@ -10,7 +10,7 @@ import requests
 # --- 1. Load the trained model and other necessary files ---
 MODEL_FILE = 'green_air_classifier.joblib'
 FEATURES_FILE = 'urban_sound_features.joblib'
-AQI_API_KEY = "OPENWEATHER_API_KEY" # Replace with your actual API key
+AQI_API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 
 app = flask.Flask(__name__)
 # Enable CORS to allow the React frontend to communicate with this backend
