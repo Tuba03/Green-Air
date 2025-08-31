@@ -22,5 +22,6 @@
       "source": "/(.*)",
       "destination": "/frontend/build/index.html"
     }
-  ]
+  ],
+  "outputDirectory": "frontend/build"
 }
