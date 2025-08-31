@@ -6,7 +6,10 @@
   "builds": [
     {
       "src": "frontend/package.json",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "frontend/**"
+      }
     },
     {
       "src": "api.py",
