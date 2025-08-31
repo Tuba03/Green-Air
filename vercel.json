@@ -23,5 +23,5 @@
       "destination": "/frontend/build/index.html"
     }
   ],
-  "outputDirectory": "frontend/build"
+  "outputDirectory": "frontend/build/index.html"
 }
