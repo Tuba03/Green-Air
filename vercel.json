@@ -1,19 +1,16 @@
 {
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api.py" },
+    { "source": "/(.*)", "destination": "/frontend/build/index.html" }
+  ],
   "builds": [
     {
       "src": "frontend/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": "frontend/**"
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "api.py",
       "use": "@vercel/python"
     }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api.py" },
-    { "source": "/(.*)", "destination": "/build/index.html" }
   ]
 }
