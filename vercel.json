@@ -12,5 +12,7 @@
       "src": "api.py",
       "use": "@vercel/python"
     }
-  ]
+  ],
+  "installCommand": "npm install && cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build"
 }
