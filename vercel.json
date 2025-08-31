@@ -12,7 +12,5 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build"
     }
-  ],
-  "installCommand": "npm install && cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build"
+  ]
 }
