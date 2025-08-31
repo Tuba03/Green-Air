@@ -1,21 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/api.py": {
-      "runtime": "vercel-python@3.9.6"
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/api.py"
+      "src": "api/api.py",
+      "use": "@vercel/python"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/build/$1"
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
     }
   ],
-  "installCommand": "npm install && cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/build"
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/api.py" },
+    { "source": "/(.*)", "destination": "/frontend/build/$1" }
+  ]
 }
