@@ -1,18 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "builds": [
-    {
-      "src": "api/api.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -23,5 +10,5 @@
       "destination": "/frontend/build/index.html"
     }
   ],
-  "outputDirectory": "frontend/build/index.html"
+  "outputDirectory": "frontend/build"
 }
