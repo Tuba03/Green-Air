@@ -12,3 +12,4 @@ __pycache__/
 
 # Ignore the raw audio files
 audio/
+.vercel

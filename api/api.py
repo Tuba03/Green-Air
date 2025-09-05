@@ -6,6 +6,21 @@ import joblib
 import librosa
 import numpy as np
 import requests
+import tempfile
+from vercel import Vercel
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+@app.route('/analyze_sound', methods=['POST'])
+def analyze_uploaded_audio():
+    # Your existing logic for sound analysis here
+    pass
+
+# Vercel handler to expose the Flask app as a serverless function
+def handler(req, res):
+    return app(req, res)
+
 
 # --- 1. Load the trained model and other necessary files ---
 MODEL_FILE = 'green_air_classifier.joblib'
@@ -73,9 +88,10 @@ def analyze_uploaded_audio():
     lat = request.form.get('lat')
     lon = request.form.get('lon')
 
-    # Save the uploaded file temporarily
-    temp_path = "temp_audio.wav"
-    audio_file.save(temp_path)
+    # Save the uploaded file to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+        temp_path = temp_file.name
+        audio_file.save(temp_path)
 
     # Extract features from the temporary file
     features = extract_features(temp_path)
@@ -85,10 +101,9 @@ def analyze_uploaded_audio():
         return jsonify({"error": "Failed to process audio file."}), 500
 
     # Make a prediction using the loaded model
-    # The model expects a 2D array, so we reshape the features
     prediction_label = model.predict([features])[0]
 
-    # Clean up the temporary file
+    # Clean up the temporary file after use
     os.remove(temp_path)
 
     # Fetch AQI data if location is provided
@@ -99,7 +114,7 @@ def analyze_uploaded_audio():
     # Return the analysis results as a JSON response
     return jsonify({
         'sound_type': prediction_label,
-        'noise_level_estimate_db': '70-90 dB', # Placeholder, requires a more complex model
+        'noise_level_estimate_db': '70-90 dB',  # Placeholder, requires a more complex model
         'air_quality_index': aqi,
         'air_quality_description': aqi_description,
         'recommendation': 'Based on this data, consider using public transport to reduce both noise and air pollution.',
