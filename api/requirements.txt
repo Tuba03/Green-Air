@@ -1,7 +1,6 @@
 Flask
 flask-cors
 joblib
-librosa
 numpy
-requests
+librosa
 scikit-learn

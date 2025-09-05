@@ -1,5 +1,16 @@
+# ignore large datasets & audio files
+UrbanSound8K.csv
 audio/
-*.mp3
 *.wav
-*.flac
-*.ogg
+*.mp3
+*.zip
+
+# ignore local venv, node_modules build artifacts etc.
+venv/
+frontend/node_modules/
+frontend/build/
+__pycache__/
+*.pyc
+*.pkl
+*.joblib
+*.h5
