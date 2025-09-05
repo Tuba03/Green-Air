@@ -1,1 +1,6 @@
-Flask
+flask
+flask-cors
+joblib
+librosa
+numpy
+requests

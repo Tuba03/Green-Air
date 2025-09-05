@@ -7,29 +7,15 @@ import librosa
 import numpy as np
 import requests
 import tempfile
-from vercel import Vercel
-from flask import Flask, jsonify, request
 
-app = Flask(__name__)
-
-@app.route('/analyze_sound', methods=['POST'])
-def analyze_uploaded_audio():
-    # Your existing logic for sound analysis here
-    pass
-
-# Vercel handler to expose the Flask app as a serverless function
-def handler(req, res):
-    return app(req, res)
-
+app = flask.Flask(__name__)
+# Enable CORS to allow the React frontend to communicate with this backend
+CORS(app)
 
 # --- 1. Load the trained model and other necessary files ---
 MODEL_FILE = 'green_air_classifier.joblib'
 FEATURES_FILE = 'urban_sound_features.joblib'
 AQI_API_KEY = os.environ.get("OPENWEATHER_API_KEY")
-
-app = flask.Flask(__name__)
-# Enable CORS to allow the React frontend to communicate with this backend
-CORS(app)
 
 try:
     model = joblib.load(MODEL_FILE)
