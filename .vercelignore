@@ -1,16 +1,10 @@
-# ignore large datasets & audio files
-UrbanSound8K.csv
-audio/
-*.wav
-*.mp3
-*.zip
-
-# ignore local venv, node_modules build artifacts etc.
+# Ignore virtual environment & local files
 venv/
-frontend/node_modules/
-frontend/build/
 __pycache__/
 *.pyc
-*.pkl
-*.joblib
-*.h5
+.DS_Store
+
+# Ignore training artifacts not needed for deployment
+audio/
+train.py
+UrbanSound8K.csv
