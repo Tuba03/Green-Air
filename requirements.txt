@@ -1,0 +1,8 @@
+# requirements.txt for Green-Air backend
+flask
+flask-cors
+numpy
+scikit-learn
+soundfile
+requests
+python-dotenv

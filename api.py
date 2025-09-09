@@ -1,111 +1,155 @@
+# api.py
 import os
-import flask
-from flask import request, jsonify
-from flask_cors import CORS
+import tempfile
+import time
 import joblib
 import librosa
 import numpy as np
 import requests
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from pydub import AudioSegment
+from dotenv import load_dotenv
 
-# --- 1. Load the trained model and other necessary files ---
-MODEL_FILE = 'green_air_classifier.joblib'
-FEATURES_FILE = 'urban_sound_features.joblib'
-AQI_API_KEY = "OPENWEATHER_API_KEY" # Replace with your actual API key
-
-app = flask.Flask(__name__)
-# Enable CORS to allow the React frontend to communicate with this backend
+app = Flask(__name__)
 CORS(app)
 
-try:
-    model = joblib.load(MODEL_FILE)
-    features_df = joblib.load(FEATURES_FILE)
-    # Get the unique classes from the features file
-    model_classes = features_df['label'].unique().tolist()
-    print("Model and features loaded successfully.")
-except FileNotFoundError:
-    print(f"Error: Required files not found. Please run 'train.py' first.")
-    model = None
-    model_classes = []
+# --- Load env ---
+load_dotenv()
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "YOUR_API_KEY_HERE")
 
-# --- 2. Feature Extraction Function (re-used from train.py) ---
-def extract_features(file_path):
-    """Extracts MFCC features for a single audio file."""
+# --- Load ML model ---
+MODEL_FILE = "green_air_classifier.joblib"
+model = None
+if os.path.exists(MODEL_FILE):
     try:
-        y, sr = librosa.load(file_path, duration=3)
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-        mfccs_mean = np.mean(mfccs.T, axis=0)
-        return mfccs_mean
+        model = joblib.load(MODEL_FILE)
+        print("✅ Model loaded successfully")
     except Exception as e:
-        print(f"Error during feature extraction: {e}")
-        return None
+        print("⚠️ Could not load model:", e)
 
-# --- 3. Air Quality Index (AQI) API Integration ---
+# --- In-memory DB ---
+community_data = []
+
+# Convert to wav
+def convert_to_wav(src_path, dst_path):
+    audio = AudioSegment.from_file(src_path)
+    audio = audio.set_channels(1).set_frame_rate(22050)
+    audio.export(dst_path, format="wav")
+
+# Feature extraction
+def extract_features(file_path, duration=3):
+    y, sr = librosa.load(file_path, sr=None, duration=duration)
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+    features = np.mean(mfccs.T, axis=0)
+    return features, y, sr
+
+# Estimate dB SPL-like
+def estimate_db(y):
+    rms = np.sqrt(np.mean(y**2))
+    if rms <= 0:
+        return 0.0
+    return round(float(20 * np.log10(rms) + 94), 2)
+
+# AQI fetch
 def get_aqi(lat, lon):
-    """Fetches real-time AQI data from a public API."""
     try:
-        # Using OpenWeatherMap's Air Pollution API as a free option
-        url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={AQI_API_KEY}"
-        response = requests.get(url)
-        data = response.json()
-        
-        if response.status_code == 200 and data['list']:
-            aqi = data['list'][0]['main']['aqi']
-            # Map AQI code to a description
-            aqi_mapping = {1: 'Good', 2: 'Fair', 3: 'Moderate', 4: 'Poor', 5: 'Very Poor'}
-            return aqi, aqi_mapping.get(aqi, 'Unknown')
-        else:
-            return None, "Data not available"
-    except Exception as e:
-        print(f"Error fetching AQI data: {e}")
-        return None, "API call failed"
+        url = (
+            f"https://api.openweathermap.org/data/2.5/air_pollution"
+            f"?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}"
+        )
+        res = requests.get(url, timeout=8)
+        data = res.json()
+        if res.status_code == 200 and data.get("list"):
+            entry = data["list"][0]
+            aqi = int(entry["main"]["aqi"])
+            comp = entry["components"]
+            return {
+                "aqi": aqi,
+                "level": {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}.get(aqi, "Unknown"),
+                "components": {
+                    "pm2_5": float(comp.get("pm2_5", 0)),
+                    "pm10": float(comp.get("pm10", 0)),
+                    "no2": float(comp.get("no2", 0)),
+                    "co": float(comp.get("co", 0)),
+                },
+            }
+        return {"error": "AQI unavailable"}
+    except Exception:
+        return {"error": "AQI fetch failed"}
 
-# --- 4. The Main API Endpoint ---
-@app.route('/analyze_sound', methods=['POST'])
+@app.route("/analyze_sound", methods=["POST"])
 def analyze_uploaded_audio():
-    if model is None:
-        return jsonify({"error": "Model not loaded. Please contact the administrator."}), 500
-    
-    # Check if a file was uploaded
-    if 'audio_file' not in request.files:
-        return jsonify({"error": "No audio file provided."}), 400
+    try:
+        if "audio_file" not in request.files:  # ✅ match frontend key
+            return jsonify({"error": "No audio file uploaded"}), 400
 
-    audio_file = request.files['audio_file']
-    lat = request.form.get('lat')
-    lon = request.form.get('lon')
+        audio_file = request.files["audio_file"]
+        lat = request.form.get("lat")
+        lon = request.form.get("lon")
 
-    # Save the uploaded file temporarily
-    temp_path = "temp_audio.wav"
-    audio_file.save(temp_path)
+        # Save temp
+        suffix = os.path.splitext(audio_file.filename)[1] or ".webm"
+        tmp_src = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp_src.write(audio_file.read())
+        tmp_src.close()
 
-    # Extract features from the temporary file
-    features = extract_features(temp_path)
+        tmp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        tmp_wav.close()
+        convert_to_wav(tmp_src.name, tmp_wav.name)
 
-    if features is None:
-        os.remove(temp_path)
-        return jsonify({"error": "Failed to process audio file."}), 500
+        # Extract features
+        features, y, sr = extract_features(tmp_wav.name)
+        noise_db = estimate_db(y)
+        predicted_label = None
+        if model is not None:
+            try:
+                predicted_label = model.predict([features])[0]
+            except Exception as e:
+                print("Prediction error:", e)
 
-    # Make a prediction using the loaded model
-    # The model expects a 2D array, so we reshape the features
-    prediction_label = model.predict([features])[0]
+        # AQI lookup
+        air_quality = {}
+        if lat and lon:
+            air_quality = get_aqi(lat, lon)
 
-    # Clean up the temporary file
-    os.remove(temp_path)
+        # Entry in community
+        entry = {
+            "timestamp": time.time(),
+            "location": {"lat": float(lat), "lon": float(lon)},
+            "sound_analysis": {
+                "type": str(predicted_label or "Unknown"),
+                "noise_level_db": float(noise_db or 0),
+            },
+            "air_quality": air_quality,
+        }
+        community_data.append(entry)
 
-    # Fetch AQI data if location is provided
-    aqi, aqi_description = None, "Location data not provided"
-    if lat and lon:
-        aqi, aqi_description = get_aqi(lat, lon)
-    
-    # Return the analysis results as a JSON response
-    return jsonify({
-        'sound_type': prediction_label,
-        'noise_level_estimate_db': '70-90 dB', # Placeholder, requires a more complex model
-        'air_quality_index': aqi,
-        'air_quality_description': aqi_description,
-        'recommendation': 'Based on this data, consider using public transport to reduce both noise and air pollution.',
-        'message': 'Analysis successful.'
-    })
+        return jsonify(entry), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# --- 5. Run the Flask app ---
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+@app.route("/community-data", methods=["GET"])
+def get_community_data():
+    limit = int(request.args.get("limit", 50))
+    return jsonify({"measurements": community_data[-limit:]})
+
+if __name__ == "__main__":
+    print("🚀 Starting GreenAir backend...")
+    app.run(host="0.0.0.0", port=5000, debug=True)
+# """    url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}"
+#     try:
+#         response = requests.get(url)
+#         if response.status_code == 200:
+#             data = response.json()
+#             if data.get('list'):
+#                 aqi = data['list'][0]['main']['aqi']
+#                 components = data['list'][0]['components']
+#                 return {'aqi': aqi, 'components': components}
+#         print(f"Failed to fetch AQI: {response.status_code} {response.text}")
+#     except Exception as e:
+#         print(f"Error fetching AQI: {e}")
+#     return None
+# # Example usage:
+# # result = fetch_air_quality(19.076, 72.8777)
+# # print(result)     

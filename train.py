@@ -1,9 +1,12 @@
 import pandas as pd
 import librosa
 import numpy as np
+
 import os
 from tqdm import tqdm
 import joblib
+import requests
+
 
 # --- 1. Configuration ---
 # File paths for the dataset
@@ -11,6 +14,33 @@ CSV_FILE = 'UrbanSound8K.csv'
 AUDIO_DIR = 'audio'
 FEATURES_FILE = 'urban_sound_features.joblib'
 MODEL_FILE = 'green_air_classifier.joblib'
+
+# OpenWeatherMap API configuration
+OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY', 'YOUR_API_KEY_HERE')  # Set your API key in env or replace
+
+# --- Air Quality Fetch Function ---
+def fetch_air_quality(lat, lon):
+    """
+    Fetches air quality data from OpenWeatherMap API for the given latitude and longitude.
+    Returns a dict with AQI and components, or None if failed.
+    """
+    url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('list'):
+                aqi = data['list'][0]['main']['aqi']
+                components = data['list'][0]['components']
+                return {'aqi': aqi, 'components': components}
+        print(f"Failed to fetch AQI: {response.status_code} {response.text}")
+    except Exception as e:
+        print(f"Error fetching AQI: {e}")
+    return None
+
+# Example usage:
+# result = fetch_air_quality(19.076, 72.8777)
+# print(result)
 
 # --- 2. Feature Extraction Function ---
 def extract_features(file_path, duration=3):
